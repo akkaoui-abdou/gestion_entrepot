@@ -375,54 +375,150 @@ Projet de gestion intelligente des sas d'entrée et de sortie pour entrepôt log
 
 ```python
 
-from enum import Enum
+from abc import ABC, abstractmethod
 
 
-class Taille(Enum):
+class Taille:
     PETIT = 1
     MOYEN = 2
     GRAND = 3
 
 
-class Sas:
-    def __init__(self, nom, taille, orientations):
-        self.nom = nom
-        self.taille = taille
-        self.orientations = orientations
-        self.occupe = False
+# =====================================
+# Véhicules
+# =====================================
 
-    def compatible(self, vehicule):
-        return (
-            self.taille.value >= vehicule.taille.value
-            and vehicule.orientation in self.orientations
-            and not self.occupe
-        )
+class Vehicule(ABC):
 
-    def __str__(self):
-        statut = "Occupé" if self.occupe else "Libre"
-        return f"{self.nom} ({self.taille.name}) - {statut}"
-
-
-class Vehicule:
-    def __init__(self, immatriculation, type_vehicule,
-                 taille, orientation, operation):
+    def __init__(self, immatriculation, orientation, operation):
         self.immatriculation = immatriculation
-        self.type_vehicule = type_vehicule
-        self.taille = taille
         self.orientation = orientation
         self.operation = operation
+
+    @property
+    @abstractmethod
+    def taille(self):
+        pass
+
+    @property
+    @abstractmethod
+    def type_vehicule(self):
+        pass
 
     def __str__(self):
         return (
             f"{self.immatriculation} | "
             f"{self.type_vehicule} | "
-            f"{self.taille.name} | "
             f"{self.orientation} | "
             f"{self.operation}"
         )
 
 
+class Utilitaire(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.PETIT
+
+    @property
+    def type_vehicule(self):
+        return "Utilitaire"
+
+
+class Camionnette(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.MOYEN
+
+    @property
+    def type_vehicule(self):
+        return "Camionnette"
+
+
+class SemiRemorque(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.GRAND
+
+    @property
+    def type_vehicule(self):
+        return "Semi-remorque"
+
+
+# =====================================
+# Sas
+# =====================================
+
+class Sas:
+
+    def __init__(
+        self,
+        nom,
+        taille,
+        orientations,
+        capacite_max
+    ):
+        self.nom = nom
+        self.taille = taille
+        self.orientations = orientations
+        self.capacite_max = capacite_max
+        self.vehicules = []
+
+    @property
+    def dispo(self):
+        return len(self.vehicules) < self.capacite_max
+
+    def is_compatible(self, vehicule):
+
+        return (
+            self.taille >= vehicule.taille
+            and vehicule.orientation in self.orientations
+            and self.dispo
+        )
+
+    def ajouter_vehicule(self, vehicule):
+
+        if not self.dispo:
+            raise ValueError(
+                f"Le sas {self.nom} est plein"
+            )
+
+        self.vehicules.append(vehicule)
+
+    def retirer_vehicule(self, immatriculation):
+
+        for vehicule in self.vehicules:
+
+            if vehicule.immatriculation == immatriculation:
+                self.vehicules.remove(vehicule)
+                return True
+
+        return False
+
+    def __str__(self):
+
+        etat = (
+            "Disponible"
+            if self.dispo
+            else "Complet"
+        )
+
+        return (
+            f"{self.nom} | "
+            f"Capacité {len(self.vehicules)}/"
+            f"{self.capacite_max} | "
+            f"{etat}"
+        )
+
+
+# =====================================
+# Gestion entrepôt
+# =====================================
+
 class GestionEntrepot:
+
     def __init__(self):
         self.sas = []
 
@@ -430,103 +526,152 @@ class GestionEntrepot:
         self.sas.append(sas)
 
     def affecter_sas(self, vehicule):
+
         compatibles = [
-            s for s in self.sas if s.compatible(vehicule)
+            s
+            for s in self.sas
+            if s.is_compatible(vehicule)
         ]
 
         if not compatibles:
-            print(
+            raise ValueError(
                 f"Aucun sas disponible pour "
                 f"{vehicule.immatriculation}"
             )
-            return None
 
-        compatibles.sort(key=lambda x: x.taille.value)
+        compatibles.sort(
+            key=lambda s: s.taille
+        )
 
         sas = compatibles[0]
-        sas.occupe = True
+
+        sas.ajouter_vehicule(vehicule)
 
         print(
-            f"Véhicule {vehicule.immatriculation} "
-            f"affecté au {sas.nom}"
+            f"Véhicule "
+            f"{vehicule.immatriculation} "
+            f"({vehicule.type_vehicule}) "
+            f"affecté au sas {sas.nom}"
         )
 
         return sas
 
-    def liberer_sas(self, nom_sas):
-        for sas in self.sas:
-            if sas.nom == nom_sas:
-                sas.occupe = False
-                print(f"{nom_sas} libéré")
-                return
+    def liberer_sas(
+        self,
+        nom_sas,
+        immatriculation
+    ):
 
-    def afficher_etat(self):
-        print("\n=== Etat des sas ===")
         for sas in self.sas:
+
+            if sas.nom == nom_sas:
+
+                return sas.retirer_vehicule(
+                    immatriculation
+                )
+
+        return False
+
+    def afficher_etat_sas(self):
+
+        print("\n=== ÉTAT DES SAS ===")
+
+        for sas in self.sas:
+
             print(sas)
 
+            if sas.vehicules:
 
-# -------------------------
-# Configuration des sas
-# -------------------------
+                print(
+                    "  Véhicules présents :"
+                )
 
-entrepot = GestionEntrepot()
+                for vehicule in sas.vehicules:
 
-entrepot.ajouter_sas(
-    Sas("SAS_P1", Taille.PETIT, ["NORD", "SUD"])
+                    print(
+                        f"   - "
+                        f"{vehicule.immatriculation}"
+                        f" ({vehicule.type_vehicule})"
+                    )
+
+            else:
+
+                print(
+                    "  Aucun véhicule"
+                )
+
+
+# =====================================
+# Démonstration
+# =====================================
+
+gestion = GestionEntrepot()
+
+gestion.ajouter_sas(
+    Sas(
+        "S1",
+        Taille.PETIT,
+        ["NORD", "SUD"],
+        capacite_max=2
+    )
 )
 
-entrepot.ajouter_sas(
-    Sas("SAS_P2", Taille.PETIT, ["NORD"])
+gestion.ajouter_sas(
+    Sas(
+        "S2",
+        Taille.MOYEN,
+        ["NORD"],
+        capacite_max=3
+    )
 )
 
-entrepot.ajouter_sas(
-    Sas("SAS_M1", Taille.MOYEN, ["NORD", "SUD", "EST"])
+gestion.ajouter_sas(
+    Sas(
+        "S3",
+        Taille.GRAND,
+        ["NORD", "SUD"],
+        capacite_max=5
+    )
 )
-
-entrepot.ajouter_sas(
-    Sas("SAS_G1", Taille.GRAND, ["NORD", "SUD", "EST", "OUEST"])
-)
-
-entrepot.ajouter_sas(
-    Sas("SAS_G2", Taille.GRAND, ["OUEST"])
-)
-
-# -------------------------
-# Arrivées de véhicules
-# -------------------------
 
 vehicules = [
-    Vehicule(
-        "AA-123-AA",
-        "Utilitaire",
-        Taille.PETIT,
+
+    Utilitaire(
+        "AA-1245-BB",
+        "SUD",
+        "ENTREE"
+    ),
+
+    Camionnette(
+        "AA-1245-CC",
         "NORD",
         "ENTREE"
     ),
-    Vehicule(
-        "BB-456-BB",
-        "Camionnette",
-        Taille.MOYEN,
-        "EST",
-        "ENTREE"
-    ),
-    Vehicule(
-        "CC-789-CC",
-        "Semi-remorque",
-        Taille.GRAND,
-        "OUEST",
+
+    SemiRemorque(
+        "AA-1245-DD",
+        "SUD",
         "SORTIE"
     ),
+
+    Utilitaire(
+        "AA-9999-ZZ",
+        "NORD",
+        "ENTREE"
+    )
 ]
 
-for v in vehicules:
-    entrepot.affecter_sas(v)
+for vehicule in vehicules:
+    gestion.affecter_sas(vehicule)
 
-entrepot.afficher_etat()
+gestion.afficher_etat_sas()
 
-# Exemple : libération d'un sas
-entrepot.liberer_sas("SAS_P1")
+print("\n--- Libération ---")
 
-entrepot.afficher_etat()
+gestion.liberer_sas(
+    "S1",
+    "AA-1245-BB"
+)
+
+gestion.afficher_etat_sas()
 ```
