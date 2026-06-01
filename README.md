@@ -675,3 +675,337 @@ gestion.liberer_sas(
 
 gestion.afficher_etat_sas()
 ```
+
+
+
+Voici le contenu au format `README.md`.
+
+# Comprendre le décorateur `@property` en Python
+
+## Définition
+
+Le décorateur `@property` permet d'utiliser une méthode comme un attribut.
+
+Sans `@property`, une méthode doit être appelée avec des parenthèses :
+
+```python
+class Vehicule:
+
+    def get_taille(self):
+        return 1
+
+
+v = Vehicule()
+
+print(v.get_taille())
+```
+
+Résultat :
+
+```text
+1
+```
+
+Avec `@property` :
+
+```python
+class Vehicule:
+
+    @property
+    def taille(self):
+        return 1
+
+
+v = Vehicule()
+
+print(v.taille)
+```
+
+Résultat :
+
+```text
+1
+```
+
+Python exécute automatiquement la méthode lorsque l'on accède à l'attribut.
+
+---
+
+# Exemple dans le projet Entrepôt
+
+## Classe Utilitaire
+
+```python
+class Utilitaire(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.PETIT
+```
+
+Utilisation :
+
+```python
+v = Utilitaire(
+    "AA-123-BB",
+    "NORD",
+    "ENTREE"
+)
+
+print(v.taille)
+```
+
+Résultat :
+
+```text
+1
+```
+
+---
+
+# Pourquoi utiliser `@property` ?
+
+## 1. Encapsulation
+
+Un attribut peut être calculé dynamiquement.
+
+Exemple :
+
+```python
+class Vehicule:
+
+    @property
+    def poids_total(self):
+        return (
+            self.poids_vehicule
+            + self.poids_charge
+        )
+```
+
+Utilisation :
+
+```python
+print(v.poids_total)
+```
+
+Le calcul est effectué automatiquement.
+
+---
+
+## 2. Lecture seule
+
+Dans notre modèle métier :
+
+```python
+class SemiRemorque(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.GRAND
+```
+
+La taille ne peut pas être modifiée :
+
+```python
+v.taille = Taille.PETIT
+```
+
+Erreur :
+
+```text
+AttributeError:
+can't set attribute
+```
+
+Cela garantit qu'un semi-remorque reste toujours de taille `GRAND`.
+
+---
+
+## 3. Compatible avec les classes abstraites
+
+Dans la classe abstraite :
+
+```python
+from abc import ABC
+from abc import abstractmethod
+
+
+class Vehicule(ABC):
+
+    @property
+    @abstractmethod
+    def taille(self):
+        pass
+```
+
+Chaque sous-classe doit obligatoirement implémenter la propriété `taille`.
+
+Exemple incorrect :
+
+```python
+class Utilitaire(Vehicule):
+    pass
+```
+
+Erreur :
+
+```text
+TypeError:
+Can't instantiate abstract class Utilitaire
+```
+
+---
+
+# Version sans `@property`
+
+Il est possible d'utiliser une méthode classique.
+
+Classe abstraite :
+
+```python
+class Vehicule(ABC):
+
+    @abstractmethod
+    def get_taille(self):
+        pass
+```
+
+Sous-classe :
+
+```python
+class Utilitaire(Vehicule):
+
+    def get_taille(self):
+        return Taille.PETIT
+```
+
+Utilisation :
+
+```python
+if sas.taille >= vehicule.get_taille():
+    print("Compatible")
+```
+
+---
+
+# Version avec `@property`
+
+```python
+if sas.taille >= vehicule.taille:
+    print("Compatible")
+```
+
+Cette syntaxe est plus naturelle et plus proche du langage métier.
+
+---
+
+# Comparaison
+
+| Sans `@property`        | Avec `@property`        |
+| ----------------------- | ----------------------- |
+| `vehicule.get_taille()` | `vehicule.taille`       |
+| Syntaxe plus verbeuse   | Syntaxe plus simple     |
+| Comportement de méthode | Comportement d'attribut |
+| Moins lisible           | Plus lisible            |
+
+---
+
+# Cas d'Utilisation Recommandés
+
+Utiliser `@property` lorsque :
+
+* la valeur est calculée ;
+* la valeur ne doit pas être modifiée directement ;
+* la valeur représente une caractéristique intrinsèque de l'objet ;
+* une validation est nécessaire avant l'accès à la donnée.
+
+Exemples :
+
+```python
+@property
+def taille(self):
+    ...
+```
+
+```python
+@property
+def type_vehicule(self):
+    ...
+```
+
+```python
+@property
+def poids_total(self):
+    ...
+```
+
+```python
+@property
+def disponible(self):
+    ...
+```
+
+---
+
+# Application au Projet Entrepôt
+
+Dans le système de gestion des sas :
+
+```python
+class Utilitaire(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.PETIT
+
+    @property
+    def type_vehicule(self):
+        return "Utilitaire"
+```
+
+```python
+class Camionnette(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.MOYEN
+
+    @property
+    def type_vehicule(self):
+        return "Camionnette"
+```
+
+```python
+class SemiRemorque(Vehicule):
+
+    @property
+    def taille(self):
+        return Taille.GRAND
+
+    @property
+    def type_vehicule(self):
+        return "Semi-remorque"
+```
+
+Avantages :
+
+* impossible d'affecter une mauvaise taille à un véhicule ;
+* modèle métier plus cohérent ;
+* code plus lisible ;
+* meilleure compatibilité avec les classes abstraites ;
+* maintenance facilitée.
+
+---
+
+# Conclusion
+
+Le décorateur `@property` permet de présenter une méthode comme un attribut.
+
+Dans le projet de gestion d'entrepôt, il est particulièrement adapté pour :
+
+* `taille`
+* `type_vehicule`
+* `dispo`
+* `capacite_restante`
+
+Il améliore la lisibilité du code tout en garantissant la cohérence des objets métier.
